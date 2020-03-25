@@ -12,30 +12,28 @@ import javax.swing.Timer;
 
 
 public class Elevator implements ActionListener {
-    
+
     public enum DoorState { OPEN, CLOSED }
     public enum Direction { UP, DOWN, NONE }
     public enum Command { MOVE_UP, MOVE_DOWN, OPEN_DOORS, CLOSE_DOORS, NONE }
-        
-    private Comparator byFloor;
-    private Comparator byFloorReversed;
-    private Comparator byDirection;
-    private Comparator byDirectionReversed;
-    
+
+    private Comparator<Request> byDirection;
+    private Comparator<Request> byDirectionReversed;
+
     private int floorCount;
-    
+
     private int currentFloor;
     private Direction currentDirection;
     private DoorState doorState;
     private boolean isMoving;
-    
+
     private List<Request> requests;
     private List<Command> commands;
-    
+
     private List<ElevatorListener> listeners;
-    
+
     private Timer timer;
-    
+
     public Elevator(int pFloorCount, int delay) {
         if(pFloorCount < 1) {
             throw new IllegalArgumentException("Floor count must be positive integer.");
@@ -43,12 +41,10 @@ public class Elevator implements ActionListener {
         if(pFloorCount > 10) {
             throw new IllegalArgumentException("Too many floors. Building codes permit at most 10 floors.");
         }
-        
-        byFloor = new SortByFloor();
-        byFloorReversed = Collections.reverseOrder(byFloor);
+
         byDirection = new SortByDirection();
         byDirectionReversed = Collections.reverseOrder(byDirection);
-        
+
         this.floorCount = pFloorCount;
         this.currentFloor = 1;
         this.currentDirection = Direction.UP;
@@ -60,19 +56,19 @@ public class Elevator implements ActionListener {
         this.timer = new Timer(delay, this);
         this.timer.start();
     }
-    
+
     public int getFloor(){
         return this.currentFloor;
     }
-    
+
     public Direction getDirection(){
         return this.currentDirection;
     }
-    
+
     public DoorState getDoorState(){
         return this.doorState;
     }
-    
+
     public Map<Integer, List<Direction>> getRequests() {
         Map<Integer, List<Direction>> floors = new HashMap<>();
         for(int i=1; i <= floorCount; i++){
@@ -84,60 +80,60 @@ public class Elevator implements ActionListener {
         });
         return floors;
     }
-    
+
     public void requestALift(int floor, Direction direction){
         if(floor < 1 || floor > floorCount){
             throw new IllegalArgumentException("Invalid floor. Must be betweeen 1 - " + floorCount + ".");
         }
-        
+
         Request newRequest = new Request(floor, direction);
         if(!requests.contains(newRequest)){
             requests.add(newRequest);
         }
     }
-    
+
     public void selectFloor(int floor){
         if(floor < 1 || floor > floorCount){
             throw new IllegalArgumentException("Invalid floor. Must be betweeen 1 - " + floorCount + ".");
         }
-        
+
         Request newRequest = new Request(floor, Direction.NONE);
         if(!requests.contains(newRequest)){
             requests.add(newRequest);
         }
     }
-    
+
     public void openDoors(){
         Command cmd = Command.NONE;
         if(!commands.isEmpty()) cmd = commands.get(0);
         if(isMoving || doorState == DoorState.OPEN || cmd == Command.OPEN_DOORS) return;
         commands.add(0, Command.OPEN_DOORS);
     }
-    
+
     public void closeDoors(){
         Command cmd = Command.NONE;
         if(!commands.isEmpty()) cmd = commands.get(0);
         if(doorState != DoorState.OPEN || cmd == Command.CLOSE_DOORS) return;
         commands.add(0, Command.CLOSE_DOORS);
     }
-    
+
     @Override
     public void actionPerformed(ActionEvent e){
         if(requests.size() > 0 || commands.size() > 0){
             process();
         }
     }
-    
+
     public void addListener(ElevatorListener listener){
         listeners.add(listener);
     }
-    
+
     public void triggerListeners(Command cmd){
         listeners.forEach((listener) -> {
             listener.onElevatorUpdate(cmd);
         });
     }
-    
+
     private void process(){
         Command pending = null;
         if(!commands.isEmpty()){
@@ -161,11 +157,11 @@ public class Elevator implements ActionListener {
                     break;
             }
         }
-        
+
         boolean isRequestForCurrentFloor = false;
         Request requestForCurrentFloor = null;
         for(Request req : requests){
-            if(req.getFloor() == currentFloor && 
+            if(req.getFloor() == currentFloor &&
                 (
                     req.getDirection() == Direction.NONE ||
                     req.getDirection() == currentDirection ||
@@ -182,11 +178,11 @@ public class Elevator implements ActionListener {
             isRequestForCurrentFloor = true;
             requests.remove(requestForCurrentFloor);
         }
-        
+
         if(isRequestForCurrentFloor){
             commands.add(0, Command.OPEN_DOORS);
         }
-        
+
         if(!requests.isEmpty()){
             Command nextMove = null;
             for(Command cmd : commands){
@@ -206,12 +202,9 @@ public class Elevator implements ActionListener {
                 currentDirection = getDirectionOfFloor(req.getFloor());
             }
         }
-        
+
         for(Request req : requests){
-            if(req.getFloor() == 2){
-                boolean isLast = isLastRequestInCurrentDirection(req);    
-            }
-            if(req.getAcknowledged() || 
+            if(req.getAcknowledged() ||
                 (   req.getDirection() != Direction.NONE &&
                     req.getDirection() != currentDirection &&
                     !isLastRequestInCurrentDirection(req)
@@ -234,11 +227,11 @@ public class Elevator implements ActionListener {
                     commands.add(relevant);
                 }
             }
-            
+
         }
-        
+
         if(commands.isEmpty()){
-            isMoving = false;   
+            isMoving = false;
         }else{
             Command next = commands.get(0);
             isMoving = (next == Command.MOVE_UP || next == Command.MOVE_DOWN);
@@ -247,15 +240,15 @@ public class Elevator implements ActionListener {
                 commands.add(0, Command.CLOSE_DOORS);
             }
         }
-        
+
         triggerListeners(pending);
     }
-    
+
     private Direction getDirectionOfFloor(int floor){
         if(currentFloor == floor) return Direction.NONE;
         return (currentFloor - floor) > 0 ? Direction.DOWN : Direction.UP;
     }
-    
+
     private boolean isLastRequestInCurrentDirection(Request a){
         for(Request i : requests){
             if(isACloserThanB(a.getFloor(), i.getFloor())) return false;
@@ -268,39 +261,39 @@ public class Elevator implements ActionListener {
         }
         return currentDirection == Direction.UP ? a < b : a > b;
     }
-    
+
     public class Request {
 
         private boolean acknowledged;
         private final int floor;
         private final Direction direction;
-        
+
         public Request(int floor, Direction direction){
             this.floor = floor;
             this.direction = direction;
             this.acknowledged = false;
         }
-        
+
         public boolean getAcknowledged(){
             return this.acknowledged;
         }
-        
+
         public void setAcknowledged(boolean acknowledged){
             this.acknowledged = acknowledged;
         }
-        
+
         public void acknowledge(){
             this.acknowledged = true;
         }
-        
+
         public int getFloor(){
             return this.floor;
         }
-        
+
         public Direction getDirection(){
             return this.direction;
         }
-        
+
         @Override
         public boolean equals(Object obj) {
             if (this == obj) {
@@ -322,14 +315,14 @@ public class Elevator implements ActionListener {
             return true;
         }
     }
-    
+
     class SortByFloor implements Comparator<Request> {
         @Override
         public int compare(Request a, Request b){
             return Integer.compare(a.getFloor(), b.getFloor());
         }
     }
-    
+
     class SortByDirection implements Comparator<Request> {
         @Override
         public int compare(Request a, Request b){
@@ -338,7 +331,7 @@ public class Elevator implements ActionListener {
             else return -1;
         }
     }
-    
+
     public interface ElevatorListener {
         public void onElevatorUpdate(Command cmd);
     }
